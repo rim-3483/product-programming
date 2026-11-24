@@ -13,11 +13,11 @@ class TaskStatus(str, Enum):
 
 
 class RunType(str, Enum):
-    SCHEDULED = "scheduled"       # Ночной по расписанию
-    MANUAL = "manual"             # Ручной днём
+    SCHEDULED = "scheduled"
+    MANUAL = "manual"
 
 
-# Фиксированные источники данных S(p) для каждого процесса (из 1_generate_data.py)
+
 PROCESS_RESOURCES: Dict[str, Set[str]] = {
     "credit_risk": {"crm", "transactions", "ratings"},
     "market_risk": {"market_data", "limits"},
@@ -26,7 +26,7 @@ PROCESS_RESOURCES: Dict[str, Set[str]] = {
     "stress_test": {"market_data", "ratings", "limits"},
 }
 
-# Базовое чистое время расчёта в минутах (clean_min / base_min)
+
 DEFAULT_PROCESS_DURATION: Dict[str, float] = {
     "credit_risk": 40.0,
     "market_risk": 25.0,
@@ -41,9 +41,9 @@ class Task:
     process_name: str
     biz_date: str
     run_type: RunType = RunType.MANUAL
-    created_at: float = 0.0                          # t_j (минута поступления заявки)
-    estimated_duration: Optional[float] = None       # w_j (прогноз длительности)
-    resources: Optional[Set[str]] = None             # R_j = S(p_j)
+    created_at: float = 0.0
+    estimated_duration: Optional[float] = None
+    resources: Optional[Set[str]] = None
     task_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     status: TaskStatus = TaskStatus.QUEUED
     started_at: Optional[float] = None
@@ -51,11 +51,10 @@ class Task:
     error_message: Optional[str] = None
 
     def __post_init__(self) -> None:
-        # Приводим run_type к Enum, если передали строкой ("manual" / "scheduled")
+
         if isinstance(self.run_type, str):
             self.run_type = RunType(self.run_type)
 
-        # Если ресурсы не переданы вручную — берём стандартный набор S(p)
         if self.resources is None:
             if self.process_name not in PROCESS_RESOURCES:
                 raise ValueError(f"Неизвестный процесс: {self.process_name}")
@@ -63,7 +62,6 @@ class Task:
         else:
             self.resources = set(self.resources)
 
-        # Если длительность w_j не передана от ML-модели — берём базовую
         if self.estimated_duration is None:
             self.estimated_duration = DEFAULT_PROCESS_DURATION.get(self.process_name, 30.0)
 
