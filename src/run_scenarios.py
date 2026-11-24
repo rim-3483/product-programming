@@ -106,3 +106,9 @@ ax.set_title(scenario["name"])
 
 plt.tight_layout()
 plt.show()
+
+assert len(orch.active_tasks) == 0
+assert len(orch.queue) == 0
+assert completed + rejected + failed == len(scenario["tasks"])
+assert conflicts == 0
+print("Проверка сценария пройдена!")
