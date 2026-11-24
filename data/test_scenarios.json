@@ -1,0 +1,234 @@
+[
+  {
+    "name": "S1 один процесс, разные даты",
+    "tasks": [
+      {
+        "id": "A",
+        "process": "credit_risk",
+        "biz_date": "2026-10-08",
+        "run_type": "manual",
+        "user": "user1",
+        "submit_at_min": 0,
+        "sources": [
+          "crm",
+          "transactions",
+          "ratings"
+        ],
+        "duration_min": 40
+      },
+      {
+        "id": "B",
+        "process": "credit_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user2",
+        "submit_at_min": 0,
+        "sources": [
+          "crm",
+          "transactions",
+          "ratings"
+        ],
+        "duration_min": 40
+      }
+    ],
+    "expected": "B ждёт A (общие источники), ошибок нет"
+  },
+  {
+    "name": "S2 разные процессы, одна дата",
+    "tasks": [
+      {
+        "id": "A",
+        "process": "credit_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user1",
+        "submit_at_min": 0,
+        "sources": [
+          "crm",
+          "transactions",
+          "ratings"
+        ],
+        "duration_min": 40
+      },
+      {
+        "id": "B",
+        "process": "market_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user2",
+        "submit_at_min": 0,
+        "sources": [
+          "market_data",
+          "limits"
+        ],
+        "duration_min": 25
+      },
+      {
+        "id": "C",
+        "process": "liquidity_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user3",
+        "submit_at_min": 0,
+        "sources": [
+          "transactions",
+          "limits"
+        ],
+        "duration_min": 30
+      }
+    ],
+    "expected": "A и B идут параллельно (нет общих источников), C ждёт обоих"
+  },
+  {
+    "name": "S3 ручной запуск против регламентного",
+    "tasks": [
+      {
+        "id": "A",
+        "process": "credit_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "scheduled",
+        "user": "user1",
+        "submit_at_min": 0,
+        "sources": [
+          "crm",
+          "transactions",
+          "ratings"
+        ],
+        "duration_min": 40
+      },
+      {
+        "id": "B",
+        "process": "credit_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user4",
+        "submit_at_min": 10,
+        "sources": [
+          "crm",
+          "transactions",
+          "ratings"
+        ],
+        "duration_min": 40
+      }
+    ],
+    "expected": "B отклонён как дубль (тот же процесс и дата)"
+  },
+  {
+    "name": "S4 ловушка взаимной блокировки",
+    "tasks": [
+      {
+        "id": "A",
+        "process": "test_A",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user1",
+        "submit_at_min": 0,
+        "sources": [
+          "crm",
+          "ratings"
+        ],
+        "duration_min": 20
+      },
+      {
+        "id": "B",
+        "process": "test_B",
+        "biz_date": "2026-10-09",
+        "run_type": "manual",
+        "user": "user1",
+        "submit_at_min": 1,
+        "sources": [
+          "ratings",
+          "crm"
+        ],
+        "duration_min": 20
+      }
+    ],
+    "expected": "B ждёт A, зависания нет"
+  },
+  {
+    "name": "S5 ночной пик",
+    "tasks": [
+      {
+        "id": "N0",
+        "process": "credit_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "scheduled",
+        "user": "user1",
+        "submit_at_min": 0,
+        "sources": [
+          "crm",
+          "transactions",
+          "ratings"
+        ],
+        "duration_min": 40
+      },
+      {
+        "id": "N1",
+        "process": "market_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "scheduled",
+        "user": "user1",
+        "submit_at_min": 3,
+        "sources": [
+          "market_data",
+          "limits"
+        ],
+        "duration_min": 25
+      },
+      {
+        "id": "N2",
+        "process": "liquidity_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "scheduled",
+        "user": "user1",
+        "submit_at_min": 6,
+        "sources": [
+          "transactions",
+          "limits"
+        ],
+        "duration_min": 30
+      },
+      {
+        "id": "N3",
+        "process": "operational_risk",
+        "biz_date": "2026-10-09",
+        "run_type": "scheduled",
+        "user": "user1",
+        "submit_at_min": 9,
+        "sources": [
+          "crm",
+          "transactions"
+        ],
+        "duration_min": 20
+      },
+      {
+        "id": "N4",
+        "process": "stress_test",
+        "biz_date": "2026-10-09",
+        "run_type": "scheduled",
+        "user": "user1",
+        "submit_at_min": 12,
+        "sources": [
+          "market_data",
+          "ratings",
+          "limits"
+        ],
+        "duration_min": 60
+      },
+      {
+        "id": "M1",
+        "process": "market_risk",
+        "biz_date": "2026-10-07",
+        "run_type": "manual",
+        "user": "user5",
+        "submit_at_min": 10,
+        "sources": [
+          "market_data",
+          "limits"
+        ],
+        "duration_min": 25
+      }
+    ],
+    "expected": "очередь, часть задач параллельно, конфликтов 0"
+  }
+]
