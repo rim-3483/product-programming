@@ -111,6 +111,86 @@ class TestOrchestrator(unittest.TestCase):
         # Только 1 заявка должна быть принята, остальные 9 отклонены как дубли
         self.assertEqual(sum(results), 1)
         self.assertEqual(len(orch.active_tasks), 1)
+    def test_resource_release_after_failure(self) -> None:
+        """Тест 8: Освобождение ресурсов и запуск очереди после падения задачи с ошибкой."""
+        orch = Orchestrator()
+        _, t1, _ = orch.submit_task("operational_risk", "2026-11-20", RunType.MANUAL, current_time=0)
+        _, t2, _ = orch.submit_task("operational_risk", "2026-11-21", RunType.MANUAL, current_time=1)
+
+        self.assertEqual(t1.status, TaskStatus.RUNNING)
+        self.assertEqual(t2.status, TaskStatus.QUEUED)
+
+        # Завершаем первую задачу с ошибкой
+        orch.complete_task(t1.task_id, success=False, current_time=10, error_message="DB timeout")
+
+        self.assertEqual(t1.status, TaskStatus.FAILED)
+        self.assertEqual(t2.status, TaskStatus.RUNNING)
+
+    def test_duplicate_in_queue(self) -> None:
+        """Тест 9: Отклонение дубликата, который уже ожидает в очереди Q(t)."""
+        orch = Orchestrator()
+        # Занимаем transactions
+        _, blocker, _ = orch.submit_task("operational_risk", "2026-11-20", RunType.MANUAL, current_time=0)
+        # Ставим credit_risk в очередь
+        ok1, queued_task, _ = orch.submit_task("credit_risk", "2026-11-20", RunType.SCHEDULED, current_time=1)
+        # Отправляем дубль того же credit_risk, пока оригинал ещё в очереди
+        ok2, returned_task, _ = orch.submit_task("credit_risk", "2026-11-20", RunType.MANUAL, current_time=2)
+
+        self.assertTrue(ok1)
+        self.assertEqual(queued_task.status, TaskStatus.QUEUED)
+        self.assertFalse(ok2)
+        self.assertEqual(returned_task.task_id, queued_task.task_id)
+        self.assertEqual(len(orch.queue), 1)
+        self.assertEqual(orch.history[-1].status, TaskStatus.REJECTED)
+
+    def test_priority_after_waiting(self) -> None:
+        """Тест 10: Длительное ожидание снижает Score (aging), позволяя ручной задаче обогнать новую регламентную."""
+        orch = Orchestrator()
+        # Блокируем transactions процессом operational_risk (20 мин)
+        _, blocker, _ = orch.submit_task("operational_risk", "2026-11-20", RunType.MANUAL, current_time=0)
+        # Ручная задача встаёт в очередь на 1-й минуте (w_j = 30)
+        _, old_manual, _ = orch.submit_task("liquidity_risk", "2026-11-20", RunType.MANUAL, current_time=1)
+        # Новая регламентная задача приходит на 35-й минуте (w_j = 40)
+        # К 35-й минуте: Score(old_manual) = 30 + 30 - 1.5 * 34 = 9.0 < Score(new_sched) = 0 + 40 - 0 = 40.0
+        _, new_sched, _ = orch.submit_task("credit_risk", "2026-11-20", RunType.SCHEDULED, current_time=35)
+
+        orch.complete_task(blocker.task_id, success=True, current_time=35)
+
+        self.assertEqual(old_manual.status, TaskStatus.RUNNING)
+        self.assertEqual(new_sched.status, TaskStatus.QUEUED)
+
+    def test_concurrent_resource_conflicts(self) -> None:
+        """Тест 11: Отсутствие конфликтов по ресурсам при конкурентной отправке разных задач из нескольких потоков."""
+        orch = Orchestrator()
+        processes = [
+            ("credit_risk", "2026-11-20"),
+            ("market_risk", "2026-11-20"),
+            ("liquidity_risk", "2026-11-20"),
+            ("operational_risk", "2026-11-20"),
+            ("stress_test", "2026-11-20"),
+            ("credit_risk", "2026-11-21"),
+            ("liquidity_risk", "2026-11-21"),
+        ]
+
+        def worker(proc: str, date: str) -> None:
+            orch.submit_task(proc, date, RunType.MANUAL, current_time=0)
+
+        threads = [threading.Thread(target=worker, args=(p, d)) for p, d in processes]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join()
+
+        # Проверяем, что ни у каких двух активных задач нет пересечения по ресурсам
+        active = orch.active_tasks
+        for i in range(len(active)):
+            for j in range(i + 1, len(active)):
+                self.assertTrue(
+                    active[i].resources.isdisjoint(active[j].resources),
+                    f"Конфликт ресурсов между {active[i].process_name} и {active[j].process_name}",
+                )
+        self.assertEqual(len(active) + len(orch.queue), len(processes))
+
 
 
 if __name__ == "__main__":
