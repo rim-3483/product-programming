@@ -1,3 +1,6 @@
-streamlit>=1.30
+# Зависимости аналитики, симуляции и интерфейса
 pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+streamlit>=1.30
 plotly>=5.18
