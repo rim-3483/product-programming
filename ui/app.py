@@ -111,64 +111,69 @@ else:
 
     st.dataframe(queue_data, use_container_width=True, hide_index=True)
 
-# Панель 3.2 (Диаграмма Ганта)
+# Панель 3.2: Диаграмма выполнения задач в модельных минутах
 st.divider()
-st.subheader("Диаграмма выполнения задач:")
+st.subheader("Диаграмма выполнения задач")
 
-# Сбор данных для диаграммы из активных задач и истории
 gantt_data = []
 
-# 1. Выбор все еще активных задач (конец = текущее время + остаток)
+# У активных задач конец интервала пока прогнозный.
 for t in snapshot["active"]:
     if t.started_at is not None:
         gantt_data.append({
-            "Задача": f"{t.process_name} {t.biz_date}",
-            "Начало": t.started_at,
-            "Конец": t.started_at + t.estimated_duration,
+            "Задача": f"{t.process_name} {t.biz_date} · {t.task_id}",
+            "Начало": float(t.started_at),
+            "Конец": float(t.started_at + t.estimated_duration),
             "Статус": "В процессе",
-            "Тип": t.run_type.value
+            "Тип": t.run_type.value,
         })
 
-# 2. Выбор завершенных задач из истории
+# У завершённых и ошибочных задач используем фактические времена из истории.
 for t in snapshot["history"]:
-    if t.status in [TaskStatus.COMPLETED, TaskStatus.FAILED] and t.started_at is not None and t.finished_at is not None:
+    if (
+        t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)
+        and t.started_at is not None
+        and t.finished_at is not None
+    ):
         gantt_data.append({
-            "Задача": f"{t.process_name} {t.biz_date}",
-            "Начало": t.started_at,
-            "Конец": t.finished_at,
+            "Задача": f"{t.process_name} {t.biz_date} · {t.task_id}",
+            "Начало": float(t.started_at),
+            "Конец": float(t.finished_at),
             "Статус": t.status.value,
-            "Тип": t.run_type.value
+            "Тип": t.run_type.value,
         })
 
 if not gantt_data:
     st.info("Нет данных для отображения. Запустите задачи.")
 else:
-    df_gantt = pd.DataFrame(gantt_data)
+    df_gantt = pd.DataFrame(gantt_data).sort_values(["Начало", "Конец"])
+    df_gantt["Длительность"] = df_gantt["Конец"] - df_gantt["Начало"]
 
-    fig = px.timeline(
+    # px.timeline предназначен для дат. Для виртуальных минут нужен числовой bar:
+    # x = длительность, base = минута начала, y = задача.
+    fig = px.bar(
         df_gantt,
-        x_start="Начало",
-        x_end="Конец",
+        x="Длительность",
         y="Задача",
+        base="Начало",
+        orientation="h",
         color="Статус",
-        hover_data=["Тип"],
+        hover_data=["Тип", "Начало", "Конец", "Длительность"],
         color_discrete_map={
             "В процессе": "#FFA500",
             "Завершено": "#2E8B57",
-            "Ошибка": "#DC143C"
-        }
+            "Ошибка": "#DC143C",
+        },
     )
-
-    fig.update_yaxes(autorange="reversed")
-    fig.update_xaxes(title_text="Модельное время (мин)")
-
-# чтобы убрать лишние отступы
+    fig.update_yaxes(autorange="reversed", title_text="")
+    fig.update_xaxes(type="linear", title_text="Модельное время (мин)", rangemode="tozero")
     fig.update_layout(
         margin=dict(l=20, r=20, t=20, b=20),
-        height=300 + (len(df_gantt["Задача"].unique()) * 30)
+        height=300 + len(df_gantt) * 30,
+        legend_title_text="Статус",
     )
-
     st.plotly_chart(fig, use_container_width=True)
+    st.caption("Для выполняющихся задач конец полосы — расчётное время завершения, а не факт.")
 
 # Панель 4: Журнал
 st.divider()
